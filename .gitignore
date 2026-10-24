@@ -1,0 +1,5 @@
+build/
+*.o
+*.a
+*.db/
+__pycache__/

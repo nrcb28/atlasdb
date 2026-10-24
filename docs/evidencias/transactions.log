@@ -1,0 +1,36 @@
+Table created
+Rows inserted
+Transaction started
+Rows updated
+Rows updated
+Transaction committed
++---------+-------+
+| titular | saldo |
++---------+-------+
+| Ana     | 7500  |
+| Luis    | 7500  |
++---------+-------+
+2 filas
++-------------+
+| saldo_total |
++-------------+
+| 15000       |
++-------------+
+1 fila
+Transaction started
+Rows updated
++---------+-------+
+| titular | saldo |
++---------+-------+
+| Ana     | 0     |
+| Luis    | 0     |
++---------+-------+
+2 filas
+Transaction rolled back
++---------+-------+
+| titular | saldo |
++---------+-------+
+| Ana     | 7500  |
+| Luis    | 7500  |
++---------+-------+
+2 filas

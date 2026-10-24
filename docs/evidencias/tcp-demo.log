@@ -1,0 +1,2 @@
+{"ok": true, "columns": ["muestras", "media"], "rows": [[2, 20.35]], "affected": 0, "message": null}
+{"ok":true,"columns":["id","sensor","valor"],"rows":[[1,"laboratorio",22.5],[2,"almacen",18.199999999999999]],"affected":0,"message":null}

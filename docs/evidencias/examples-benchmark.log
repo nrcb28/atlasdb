@@ -1,0 +1,14 @@
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion  examples/embed.c build/libatlasdb.a -pthread -lm -o build/embed
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion  tools/benchmark.c build/libatlasdb.a -pthread -lm -o build/benchmark
+build/benchmark
+Carga en memoria: 5000 filas, 0.013 s (390802 filas/s)
+Indice PRIMARY KEY: 300 consultas, 0.001 ms/consulta
+Escaneo completo: 300 consultas, 0.292 ms/consulta
+4 sesiones: 1200 consultas, 340818 consultas/s
+Medicion local, en memoria; incluye parsing y resultados. Las lecturas globales usan un mutex.
+{"columns":[],"rows":[],"affected":0,"message":"Table created"}
+{"columns":[],"rows":[],"affected":0,"message":"Transaction started"}
+{"columns":[],"rows":[],"affected":2,"message":"Rows inserted"}
+{"columns":[],"rows":[],"affected":1,"message":"Rows updated"}
+{"columns":[],"rows":[],"affected":0,"message":"Transaction committed"}
+{"columns":["name","temperature"],"rows":[["Laboratorio",22],["Almacen",18.199999999999999]],"affected":0,"message":null}

@@ -1,0 +1,77 @@
+Table created
+Rows inserted
+Index created
++-----------+------+---------+---------+
+| table     | rows | columns | indexes |
++-----------+------+---------+---------+
+| productos | 5    | 6       | 2       |
++-----------+------+---------+---------+
+1 fila
++-----------+---------+----------+-------------+--------+---------+
+| column    | type    | nullable | primary_key | unique | default |
++-----------+---------+----------+-------------+--------+---------+
+| id        | INTEGER | false    | true        | true   | NULL    |
+| nombre    | TEXT    | false    | false       | false  | NULL    |
+| categoria | TEXT    | true     | false       | false  | NULL    |
+| precio    | REAL    | false    | false       | false  | NULL    |
+| stock     | INTEGER | true     | false       | false  | 0       |
+| activo    | BOOLEAN | true     | false       | false  | true    |
++-----------+---------+----------+-------------+--------+---------+
+6 filas
++---------------------+--------------------+-------+--------------------+
+| nombre              | precio             | stock | valor_inventario   |
++---------------------+--------------------+-------+--------------------+
+| Adaptador USB-C     | 19.949999999999999 | 50    | 997.5              |
+| Monitor 27 pulgadas | 249                | 8     | 1992               |
+| Ratón ergonómico    | 39.5               | 24    | 948                |
+| Soporte de portátil | 34                 | 0     | 0                  |
+| Teclado mecánico    | 89.900000000000006 | 12    | 1078.8000000000002 |
++---------------------+--------------------+-------+--------------------+
+5 filas
++--------------+-----------+---------------------+----------------+
+| operation    | table     | index               | estimated_rows |
++--------------+-----------+---------------------+----------------+
+| INDEX LOOKUP | productos | productos_categoria | 2              |
++--------------+-----------+---------------------+----------------+
+1 fila
++------------------+
+| nombre           |
++------------------+
+| Ratón ergonómico |
+| Teclado mecánico |
++------------------+
+2 filas
++-----------------+
+| nombre          |
++-----------------+
+| Adaptador USB-C |
++-----------------+
+1 fila
+Transaction started
+Rows updated
+Rows updated
+Transaction committed
++-----------+--------------------+--------------------+
+| productos | valor_total        | precio_medio       |
++-----------+--------------------+--------------------+
+| 5         | 4651.8000000000002 | 83.882000000000005 |
++-----------+--------------------+--------------------+
+1 fila
+Transaction started
+Rows deleted
++-----------------------+
+| dentro_de_transaccion |
++-----------------------+
+| 4                     |
++-----------------------+
+1 fila
+Transaction rolled back
++------------------+-------+
+| nombre           | stock |
++------------------+-------+
+| Adaptador USB-C  | 50    |
+| Ratón ergonómico | 24    |
+| Teclado mecánico | 10    |
++------------------+-------+
+3 filas
+Checkpoint complete

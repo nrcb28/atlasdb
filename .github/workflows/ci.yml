@@ -1,0 +1,22 @@
+name: C17 checks
+on:
+  push:
+  pull_request:
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and validate
+        run: make -j2 CC=${{ matrix.compiler }} CFLAGS='-O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Werror' check
+      - name: Examples and local benchmark
+        run: make CC=${{ matrix.compiler }} examples build/embed benchmark && ./build/embed
+  sanitizers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Address and undefined behavior sanitizers
+        run: make -j2 sanitize

@@ -1,0 +1,37 @@
+make BUILD=build/sanitize CFLAGS='-O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie' LDFLAGS='-fsanitize=address,undefined -no-pie' test
+make[1]: Entering directory '/workspace/work/atlasdb'
+mkdir -p build/sanitize
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie -MMD -MP -c src/util.c -o build/sanitize/util.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie -MMD -MP -c src/parser.c -o build/sanitize/parser.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie -MMD -MP -c src/index.c -o build/sanitize/index.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie -MMD -MP -c src/model.c -o build/sanitize/model.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie -MMD -MP -c src/engine.c -o build/sanitize/engine.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie -MMD -MP -c src/storage.c -o build/sanitize/storage.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie -MMD -MP -c src/database.c -o build/sanitize/database.o
+ar rcs build/sanitize/libatlasdb.a build/sanitize/util.o build/sanitize/parser.o build/sanitize/index.o build/sanitize/model.o build/sanitize/engine.o build/sanitize/storage.o build/sanitize/database.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie -fsanitize=address,undefined -no-pie tests/test_atlas.c build/sanitize/libatlasdb.a -pthread -lm -o build/sanitize/test_atlas
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie -fsanitize=address,undefined -no-pie tests/test_parser.c build/sanitize/libatlasdb.a -pthread -lm -o build/sanitize/test_parser
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie -fsanitize=address,undefined -no-pie tests/test_index.c build/sanitize/libatlasdb.a -pthread -lm -o build/sanitize/test_index
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie -fsanitize=address,undefined -no-pie tests/test_storage.c build/sanitize/libatlasdb.a -pthread -lm -o build/sanitize/test_storage
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie -fsanitize=address,undefined -no-pie tests/test_engine_edges.c build/sanitize/libatlasdb.a -pthread -lm -o build/sanitize/test_engine_edges
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie -fsanitize=address,undefined -no-pie tests/test_util.c build/sanitize/libatlasdb.a -pthread -lm -o build/sanitize/test_util
+build/sanitize/test_atlas
+AtlasDB C API: 390 checks passed
+build/sanitize/test_parser
+parser: 18297 checks passed (18,000 deterministic stress inputs)
+build/sanitize/test_index
+index/model: 60,000 AVL keys, numeric boundaries, ownership and constraints OK
+build/sanitize/test_storage
+storage: 459 assertions passed
+build/sanitize/test_engine_edges
+engine edges: 437 checks passed
+build/sanitize/test_util
+util: 95 checks passed (UTF-8, JSON, numeric bounds, 64 MiB result budget)
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie -MMD -MP -c src/main.c -o build/sanitize/main.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie -MMD -MP -c src/server.c -o build/sanitize/server.o
+cc -fsanitize=address,undefined -no-pie -O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie build/sanitize/main.o build/sanitize/server.o build/sanitize/libatlasdb.a -pthread -lm -o build/sanitize/atlasdb
+python3 tests/integration.py build/sanitize/atlasdb
+AtlasDB integration: 78 checks passed
+python3 tests/frontend.py build/sanitize/atlasdb
+frontend: Unicode, escaped headers, alignment and script framing passed
+make[1]: Leaving directory '/workspace/work/atlasdb'

@@ -1,0 +1,45 @@
+mkdir -p build
+CC='cc' python3 tests/differential.py
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -MMD -MP -c src/util.c -o build/util.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -MMD -MP -c src/parser.c -o build/parser.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -MMD -MP -c src/index.c -o build/index.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -MMD -MP -c src/model.c -o build/model.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -MMD -MP -c src/engine.c -o build/engine.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -MMD -MP -c src/storage.c -o build/storage.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -MMD -MP -c src/database.c -o build/database.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -MMD -MP -c src/main.c -o build/main.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -MMD -MP -c src/server.c -o build/server.o
+AtlasDB differential: 20323 comparisons passed (SQLite and indexed versus scan)
+ar rcs build/libatlasdb.a build/util.o build/parser.o build/index.o build/model.o build/engine.o build/storage.o build/database.o
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion  tests/test_atlas.c build/libatlasdb.a -pthread -lm -o build/test_atlas
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion  tests/test_parser.c build/libatlasdb.a -pthread -lm -o build/test_parser
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion  tests/test_index.c build/libatlasdb.a -pthread -lm -o build/test_index
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion  tests/test_storage.c build/libatlasdb.a -pthread -lm -o build/test_storage
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion  tests/test_engine_edges.c build/libatlasdb.a -pthread -lm -o build/test_engine_edges
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion  tests/test_util.c build/libatlasdb.a -pthread -lm -o build/test_util
+cc  -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion build/main.o build/server.o build/libatlasdb.a -pthread -lm -o build/atlasdb
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion  tests/test_parser_alloc.c build/libatlasdb.a -pthread -lm -Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free -o build/test_parser_alloc
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion  tests/test_runtime_alloc.c build/libatlasdb.a -pthread -lm -Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free -o build/test_runtime_alloc
+cc -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion  tests/test_storage_faults.c build/libatlasdb.a -pthread -lm -Wl,--wrap=write,--wrap=fsync,--wrap=ftruncate,--wrap=rename -o build/test_storage_faults
+build/test_atlas
+AtlasDB C API: 390 checks passed
+build/test_parser
+parser: 18297 checks passed (18,000 deterministic stress inputs)
+build/test_index
+index/model: 60,000 AVL keys, numeric boundaries, ownership and constraints OK
+build/test_storage
+storage: 459 assertions passed
+build/test_engine_edges
+engine edges: 437 checks passed
+build/test_util
+util: 95 checks passed (UTF-8, JSON, numeric bounds, 64 MiB result budget)
+python3 tests/integration.py build/atlasdb
+build/test_parser_alloc
+parser allocations: 960 failure injections without outstanding allocations
+build/test_runtime_alloc
+runtime allocations: 97121 checks, 1150 failure injections across 23 SQL scenarios
+build/test_storage_faults
+storage faults: 954 assertions passed across 26 fault scenarios
+AtlasDB integration: 78 checks passed
+python3 tests/frontend.py build/atlasdb
+frontend: Unicode, escaped headers, alignment and script framing passed

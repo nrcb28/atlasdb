@@ -1,0 +1,25 @@
+Table created
+Rows inserted
+Index created
+Transaction started
+Rows updated
+Transaction committed
++---------+----------------+
+| nombre  | valor_centimos |
++---------+----------------+
+| Raton   | 85200          |
+| Teclado | 87890          |
++---------+----------------+
+2 filas
++-------------+----------------+
+| referencias | total_centimos |
++-------------+----------------+
+| 2           | 173090         |
++-------------+----------------+
+1 fila
++--------------+-----------+------------------+----------------+
+| operation    | table     | index            | estimated_rows |
++--------------+-----------+------------------+----------------+
+| INDEX LOOKUP | productos | productos_nombre | 1              |
++--------------+-----------+------------------+----------------+
+1 fila
