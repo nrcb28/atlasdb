@@ -1,0 +1,42 @@
+name: Windows C#
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: mingw-w64-ucrt-x86_64-gcc
+      - name: Compile original C engine for Windows
+        shell: pwsh
+        run: ./windows/build-native.ps1 -Gcc C:\msys64\ucrt64\bin\gcc.exe
+      - name: Build C# and run managed/native integration checks
+        shell: pwsh
+        run: |
+          dotnet build windows/AtlasDB.Cli -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet run --project windows/AtlasDB.Tests -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tests/windows_frontend.py --dotnet dotnet --app windows/AtlasDB.Cli/bin/Release/net10.0/AtlasDB.dll
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Publish self-contained application
+        shell: pwsh
+        run: ./windows/publish.ps1 -Gcc C:\msys64\ucrt64\bin\gcc.exe
+      - name: Test packaged executable
+        shell: pwsh
+        run: python tests/windows_frontend.py --app build/windows-x64/AtlasDB.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AtlasDB-Windows-x64
+          path: build/windows-x64/
+          if-no-files-found: error

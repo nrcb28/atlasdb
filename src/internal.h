@@ -2,7 +2,11 @@
 #define ADB_INTERNAL_H
 
 #include "atlasdb.h"
+#ifdef _WIN32
+#include "windows_compat.h"
+#else
 #include <pthread.h>
+#endif
 #include <stdarg.h>
 
 #define ADB_MAX_TABLES 1024u

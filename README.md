@@ -4,6 +4,10 @@ Una base de datos relacional escrita en **C17**, con biblioteca embebible, conso
 
 El objetivo es estudiar y ampliar un sistema completo. Su diseño favorece la claridad y la integridad de los datos: cada escritura trabaja sobre una copia del estado y los commits persistentes guardan una imagen completa en el WAL. Este enfoque tiene un coste alto en memoria y disco; AtlasDB no pretende reemplazar una base de datos de producción.
 
+## Windows con C#
+
+La [edición Windows x64](windows/README.md) incluye consola y servidor en C# (.NET 10), una biblioteca administrada y el motor original como DLL. El workflow **Windows C#** genera un paquete autocontenido. Conserva SQL y formato de datos; documenta diferencias de interfaz y durabilidad.
+
 ## Documentación ampliada
 
 - [Casos de uso e integración avanzada](docs/usos-avanzados.md).

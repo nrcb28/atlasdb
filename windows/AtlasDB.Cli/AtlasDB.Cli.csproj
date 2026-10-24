@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><AssemblyName>AtlasDB</AssemblyName></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../AtlasDB.Managed/AtlasDB.Managed.csproj" />
+    <None Include="../native/bin/atlasdb_native.dll" Link="atlasdb_native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('../native/bin/atlasdb_native.dll')" />
+    <None Include="../native/bin/libatlasdb_native.so" Link="libatlasdb_native.so" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" Condition="Exists('../native/bin/libatlasdb_native.so')" />
+  </ItemGroup>
+</Project>

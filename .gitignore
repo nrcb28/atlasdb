@@ -3,3 +3,9 @@ build/
 *.a
 *.db/
 __pycache__/
+
+# .NET and native Windows outputs
+windows/**/bin/
+windows/**/obj/
+.vs/
+*.user

@@ -18,9 +18,9 @@ def main() -> None:
     output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     files = [root / name for name in ["README.md", "LICENSE", "Makefile", ".gitignore"]]
-    for folder in ["include", "src", "tests", "examples", "docs", "tools", ".github"]:
+    for folder in ["include", "src", "tests", "examples", "docs", "tools", ".github", "windows"]:
         files.extend(path for path in (root / folder).rglob("*")
-                     if path.is_file() and not path.is_symlink() and "__pycache__" not in path.parts)
+                     if path.is_file() and not path.is_symlink() and not any(part in {"__pycache__", "bin", "obj"} for part in path.parts))
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for path in sorted(files):
             if path.resolve() == output or path.suffix == ".pyc":

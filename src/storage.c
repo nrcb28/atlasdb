@@ -10,7 +10,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <sys/file.h>
+#endif
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -376,14 +378,25 @@ static bool sync_file(int fd) {
     return rc == 0;
 }
 static bool sync_directory(const ADBStorage *storage, ADBError *error) {
+#ifdef _WIN32
+    /* Windows has no POSIX directory fsync. File commits use _commit and
+     * checkpoint publication uses MoveFileExW with MOVEFILE_WRITE_THROUGH. */
+    (void)storage; (void)error;
+    return true;
+#else
     int fd = open(storage->directory, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
     if (fd < 0) return io_error(error, "open database directory");
     bool ok = sync_file(fd);
     int saved = errno; close(fd); errno = saved;
     return ok || io_error(error, "sync database directory");
+#endif
 }
 /* Creating a new database directory also changes its parent directory. */
 static bool sync_parent_directory(const ADBStorage *storage, ADBError *error) {
+#ifdef _WIN32
+    (void)storage; (void)error;
+    return true;
+#else
     char *parent = adb_strdup(storage->directory, error);
     if (!parent) return false;
     size_t length = strlen(parent);
@@ -398,6 +411,7 @@ static bool sync_parent_directory(const ADBStorage *storage, ADBError *error) {
     bool ok = sync_file(fd);
     int saved = errno; close(fd); errno = saved;
     return ok || io_error(error, "sync parent directory");
+#endif
 }
 static void frame_header(unsigned char header[FRAME_SIZE], const unsigned char *payload, size_t length) {
     memcpy(header, frame_magic, sizeof(frame_magic));
