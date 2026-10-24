@@ -1,10 +1,12 @@
 param([string]$Gcc = "gcc")
 $ErrorActionPreference = "Stop"
+$compiler = (Get-Command $Gcc -ErrorAction Stop).Source
+$env:PATH = (Split-Path $compiler -Parent) + [IO.Path]::PathSeparator + $env:PATH
 $root = Split-Path $PSScriptRoot -Parent
 $out = Join-Path $PSScriptRoot "native/bin"
 New-Item -ItemType Directory -Force $out | Out-Null
 $files = @("windows/native/bridge.c", "src/util.c", "src/parser.c", "src/index.c", "src/model.c", "src/engine.c", "src/storage.c", "src/database.c")
-$arguments = @("-shared", "-static-libgcc", "-D_POSIX_C_SOURCE=200809L", "-D_FILE_OFFSET_BITS=64", "-std=c17", "-O2", "-Wall", "-Wextra", "-Werror", "-I$root/include", "-I$root/src")
+$arguments = @("-shared", "-static", "-static-libgcc", "-D_POSIX_C_SOURCE=200809L", "-D_FILE_OFFSET_BITS=64", "-std=c17", "-O2", "-Wall", "-Wextra", "-Werror", "-I$root/include", "-I$root/src")
 $arguments += $files | ForEach-Object { Join-Path $root $_ }
 $arguments += @("-lm", "-o", (Join-Path $out "atlasdb_native.dll"))
 & $Gcc @arguments
