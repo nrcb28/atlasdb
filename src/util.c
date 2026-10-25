@@ -67,6 +67,11 @@ bool adb_utf8_valid(const char *text) {
 
 bool adb_buffer_append(ADBBuffer *buffer, const void *data, size_t length) {
     if (buffer->failed) return false;
+    if (buffer->maximum && (length > buffer->maximum ||
+                            buffer->length > buffer->maximum - length)) {
+        buffer->failed = true;
+        return false;
+    }
     if (length > SIZE_MAX - buffer->length - 1) { buffer->failed = true; return false; }
     size_t required = buffer->length + length + 1;
     if (required > buffer->capacity) {
@@ -316,7 +321,7 @@ bool adb_result_message(ADBResult *result, const char *format, ...) {
 }
 
 char *adb_result_json(const ADBResult *result) {
-    ADBBuffer buffer = {0};
+    ADBBuffer buffer = {.maximum = ADB_MAX_JSON_BYTES};
     adb_buffer_append(&buffer, "{\"columns\":[", 12);
     for (size_t i = 0; i < result->ncolumns; i++) {
         if (i) adb_buffer_append(&buffer, ",", 1);

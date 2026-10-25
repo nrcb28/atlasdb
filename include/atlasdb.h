@@ -9,11 +9,12 @@
 extern "C" {
 #endif
 
-#define ADB_VERSION "1.0.0"
+#define ADB_VERSION "1.0.1"
 #define ADB_MAX_SQL (1024u * 1024u)
 #define ADB_MAX_COLUMNS 128u
 #define ADB_MAX_TEXT (1024u * 1024u)
 #define ADB_MAX_RESULT_BYTES (64u * 1024u * 1024u)
+#define ADB_MAX_JSON_BYTES (128u * 1024u * 1024u)
 
 typedef enum { ADB_NULL, ADB_INTEGER, ADB_REAL, ADB_TEXT, ADB_BOOLEAN } ADBType;
 typedef struct {

@@ -25,7 +25,7 @@ Consola: `.help`, `.tables`, `.schema nombre`, `.checkpoint` y `.quit`. Finaliza
 
 UTF-8 con una sentencia y un objeto JSON por línea. Cada conexión conserva su sesión y transacción; el cliente CLI abre una conexión por consulta. Para transacciones usar una conexión persistente, por ejemplo `examples/cliente_python.py`. Timeout por petición: 30 segundos; SQL máximo: 1 MiB. Al alcanzar el límite de clientes se cierra la conexión nueva. Ctrl+C detiene el servidor y revierte los cambios pendientes.
 
-Escucha en 127.0.0.1 por defecto y carece de autenticación/TLS; su propósito es desarrollo local.
+Escucha en 127.0.0.1 por defecto y carece de autenticación/TLS; su propósito es desarrollo local. Las interfaces remotas se rechazan salvo que se indique explícitamente `--insecure-remote`.
 
 ## Compilar en Windows
 

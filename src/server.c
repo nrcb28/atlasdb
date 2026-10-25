@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdatomic.h>
@@ -93,6 +94,36 @@ static time_t monotonic_seconds(void) {
     struct timespec value;
     if (clock_gettime(CLOCK_MONOTONIC, &value) != 0) return time(NULL);
     return value.tv_sec;
+}
+
+static bool host_is_loopback(const char *host) {
+    if (!host || !*host) return false;
+    struct addrinfo hints = {0}, *addresses = NULL;
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    int status = getaddrinfo(host, NULL, &hints, &addresses);
+    if (status != 0 || !addresses) return false;
+    bool loopback = true;
+    for (const struct addrinfo *address = addresses; address; address = address->ai_next) {
+        if (address->ai_family == AF_INET) {
+            const struct sockaddr_in *v4 = (const struct sockaddr_in *)address->ai_addr;
+            if ((ntohl(v4->sin_addr.s_addr) & UINT32_C(0xff000000)) != UINT32_C(0x7f000000)) {
+                loopback = false;
+                break;
+            }
+        } else if (address->ai_family == AF_INET6) {
+            const struct sockaddr_in6 *v6 = (const struct sockaddr_in6 *)address->ai_addr;
+            if (!IN6_IS_ADDR_LOOPBACK(&v6->sin6_addr)) {
+                loopback = false;
+                break;
+            }
+        } else {
+            loopback = false;
+            break;
+        }
+    }
+    freeaddrinfo(addresses);
+    return loopback;
 }
 
 static void *serve_connection(void *argument) {
@@ -195,8 +226,14 @@ static int open_socket(const char *host, unsigned port, bool listener) {
     return fd;
 }
 
-int adb_run_server(ADBDatabase *database, const char *host, unsigned port, size_t max_clients) {
-    if (!database || !host || !max_clients || max_clients > 1024 || !port || port > 65535) return 1;
+int adb_run_server(ADBDatabase *database, const char *host, unsigned port, size_t max_clients,
+                   bool insecure_remote) {
+    if (!database || !host || !max_clients || max_clients > ADB_MAX_CLIENTS || !port || port > 65535) return 1;
+    if (!insecure_remote && !host_is_loopback(host)) {
+        fprintf(stderr, "Por seguridad, el servidor solo puede escuchar en loopback. "
+                        "Usa --insecure-remote únicamente detrás de una red protegida.\n");
+        return 1;
+    }
     int listener = open_socket(host, port, true);
     if (listener < 0) return 1;
     Server server = {.database = database, .capacity = max_clients};
@@ -301,7 +338,7 @@ int adb_run_client(const char *host, unsigned port, const char *sql) {
         if (count <= 0) break;
         char *newline = memchr(chunk, '\n', (size_t)count);
         size_t length = newline ? (size_t)(newline - chunk) : (size_t)count;
-        if (response.length > ADB_MAX_FRAME || length > ADB_MAX_FRAME - response.length ||
+        if (response.length > ADB_MAX_JSON_BYTES || length > ADB_MAX_JSON_BYTES - response.length ||
             !adb_buffer_append(&response, chunk, length)) break;
         complete = newline != NULL;
     }

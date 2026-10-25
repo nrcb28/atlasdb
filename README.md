@@ -89,7 +89,7 @@ La consola admite `.help`, `.tables`, `.schema nombre`, `.checkpoint` y `.quit`.
 - Servidor TCP con una sesión por conexión, respuestas JSON y límite de clientes.
 - Pruebas de API, integración, comparación con SQLite y recuperación después de un cierre abrupto.
 
-No hay `JOIN`, `GROUP BY`, subconsultas, claves foráneas, usuarios, TLS ni replicación. El servidor está pensado para desarrollo local y escucha en `127.0.0.1` por defecto.
+No hay `JOIN`, `GROUP BY`, subconsultas, claves foráneas, usuarios, TLS ni replicación. El servidor está pensado para desarrollo local y escucha en `127.0.0.1` por defecto. Las interfaces remotas se rechazan por defecto; `--insecure-remote` solo debe usarse detrás de una red protegida, porque no proporciona autenticación ni TLS.
 
 ## Servidor y cliente
 

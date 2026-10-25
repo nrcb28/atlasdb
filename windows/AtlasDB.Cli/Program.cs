@@ -27,7 +27,8 @@ static async Task<int> Run(string[] args)
         using Database db = new(options.Path);
         if (options.Port is int port)
         {
-            await Wire.Serve(db, IPAddress.Parse(options.Host), port, options.MaxClients, shutdown.Token);
+            await Wire.Serve(db, IPAddress.Parse(options.Host), port, options.MaxClients,
+                options.InsecureRemote, shutdown.Token);
             return 0;
         }
         using Session session = db.CreateSession();
@@ -110,6 +111,7 @@ AtlasDB C# / Windows x64
   AtlasDB.exe --file .\examples\inventario.sql --json
   AtlasDB.exe --db .\datos --execute 'SHOW TABLES;'
   AtlasDB.exe --db .\datos --server 7373 [--host 127.0.0.1] [--max-clients 32]
+               [--insecure-remote]
   AtlasDB.exe --client 127.0.0.1:7373 --execute 'SHOW TABLES;'
   .help  .tables  .schema tabla  .checkpoint  .quit
 Una sentencia por llamada a la API o por linea TCP. El modo --file acepta scripts.
@@ -121,7 +123,7 @@ sealed class Options
     internal string? Execute, File, Client;
     internal int? Port;
     internal int MaxClients = 32;
-    internal bool Json, Help;
+    internal bool Json, Help, InsecureRemote;
     internal static Options Parse(string[] args)
     {
         Options value = new();
@@ -140,18 +142,21 @@ sealed class Options
                 case "--server": value.Port = int.Parse(Next(), CultureInfo.InvariantCulture); break;
                 case "--host": value.Host = Next(); break;
                 case "--max-clients": value.MaxClients = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--insecure-remote": value.InsecureRemote = true; break;
                 case "--json": value.Json = true; break;
                 case "--help": case "-h": value.Help = true; break;
                 default: throw new ArgumentException($"Opcion desconocida: {flag}");
             }
         }
-        if (value.Port is < 1 or > 65535 || value.MaxClients is < 1 or > 1024) throw new ArgumentException("Puerto 1..65535; max-clients 1..1024.");
+        if (value.Port is < 1 or > 65535 || value.MaxClients is < 1 or > 128) throw new ArgumentException("Puerto 1..65535; max-clients 1..128.");
         if ((value.Execute is not null ? 1 : 0) + (value.File is not null ? 1 : 0) + (value.Port is not null ? 1 : 0) > 1)
             throw new ArgumentException("Selecciona --execute, --file o --server.");
         if (value.Client is not null && (value.Execute is null || value.File is not null || value.Port is not null))
             throw new ArgumentException("--client requiere --execute y no admite --file ni --server.");
         if ((seen.Contains("--host") || seen.Contains("--max-clients")) && value.Port is null)
             throw new ArgumentException("--host y --max-clients requieren --server.");
+        if (value.InsecureRemote && value.Port is null)
+            throw new ArgumentException("--insecure-remote requiere --server.");
         return value;
     }
 }

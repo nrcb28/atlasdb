@@ -2,6 +2,8 @@ name: C17 checks
 on:
   push:
   pull_request:
+permissions:
+  contents: read
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -9,7 +11,7 @@ jobs:
       matrix:
         compiler: [gcc, clang]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Compile and validate
         run: make -j2 CC=${{ matrix.compiler }} CFLAGS='-O2 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Werror' check
       - name: Examples and local benchmark
@@ -17,6 +19,6 @@ jobs:
   sanitizers:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Address and undefined behavior sanitizers
         run: make -j2 sanitize
