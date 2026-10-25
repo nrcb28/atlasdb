@@ -17,6 +17,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#ifndef O_NOFOLLOW
+#define O_NOFOLLOW 0
+#endif
+
 /* Format 1 is independent of struct layout and native endianness. Every frame
  * carries both a header CRC and a payload CRC. No pointers are serialized. */
 #define FRAME_SIZE 32u
@@ -492,12 +496,12 @@ bool adb_storage_open(ADBStorage *storage, const char *directory, ADBState **sta
     if (!S_ISDIR(info.st_mode)) { adb_error(error, ADB_ERR_IO, "database path is not a directory"); goto fail; }
     char *path = storage_path(storage, "atlas.lock", error);
     if (!path) goto fail;
-    storage->lock_fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0600); free(path);
+    storage->lock_fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600); free(path);
     if (storage->lock_fd < 0) { io_error(error, "open database lock"); goto fail; }
     if (flock(storage->lock_fd, LOCK_EX | LOCK_NB) < 0) { io_error(error, "database directory is already locked"); goto fail; }
     path = storage_path(storage, "atlas.snapshot", error);
     if (!path) goto fail;
-    int snapshot_fd = open(path, O_RDONLY | O_CLOEXEC); free(path);
+    int snapshot_fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW); free(path);
     if (snapshot_fd < 0 && errno != ENOENT) { io_error(error, "open snapshot"); goto fail; }
     if (snapshot_fd >= 0) {
         off_t valid_end;
@@ -507,7 +511,7 @@ bool adb_storage_open(ADBStorage *storage, const char *directory, ADBState **sta
     }
     path = storage_path(storage, "atlas.wal", error);
     if (!path) goto fail;
-    storage->wal_fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0600); free(path);
+    storage->wal_fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600); free(path);
     if (storage->wal_fd < 0) { io_error(error, "open WAL"); goto fail; }
     off_t valid_end = 0;
     if (!recover_file(storage->wal_fd, false, state, &valid_end, error)) goto fail;
@@ -567,7 +571,7 @@ bool adb_storage_checkpoint(ADBStorage *storage, const ADBState *state, ADBError
     bool ok = false;
     if (!temporary || !destination || !adb_state_encode(state, &payload, &length, error)) goto done;
     frame_header(header, payload, length);
-    fd = open(temporary, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+    fd = open(temporary, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
     if (fd < 0) { io_error(error, "create checkpoint file"); goto done; }
     if (!write_all(fd, header, sizeof(header)) || !write_all(fd, payload, length) || !sync_file(fd)) {
         io_error(error, "write checkpoint file"); goto done;

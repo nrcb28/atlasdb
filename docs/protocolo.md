@@ -1,6 +1,6 @@
 # Protocolo TCP
 
-El servidor escucha por defecto en `127.0.0.1:7373`. Usa `--host` y `--server PUERTO` para seleccionar otra dirección o puerto, y `--max-clients N` para limitar conexiones.
+El servidor escucha por defecto en `127.0.0.1:7373`. Usa `--host` y `--server PUERTO` para seleccionar otra dirección o puerto, y `--max-clients N` para limitar conexiones. Por seguridad, las ediciones C y Windows rechazan por defecto direcciones que no sean loopback; `--insecure-remote` permite omitir esa protección, pero no añade TLS ni autenticación.
 
 ```sh
 ./build/atlasdb --db ./datos --server 7373 --max-clients 32

@@ -23,7 +23,8 @@ static void usage(FILE *output) {
           "  --json                Una respuesta JSON por sentencia\n"
           "  --server [PUERTO]     Servidor TCP; puerto por defecto 7373\n"
           "  --host DIRECCION      Interfaz del servidor; por defecto 127.0.0.1\n"
-          "  --max-clients N       Maximo de conexiones, de 1 a 1024 (64)\n"
+          "  --max-clients N       Maximo de conexiones, de 1 a 128 (32)\n"
+          "  --insecure-remote     Permitir escucha fuera de loopback sin TLS/auth\n"
           "  --client HOST:PUERTO  Enviar -e al servidor (una sola linea)\n"
           "  --help                Mostrar esta ayuda\n"
           "  --version             Mostrar la version\n\n"
@@ -376,13 +377,14 @@ int main(int argc, char **argv) {
     (void)setlocale(LC_CTYPE, "");
     const char *directory = ":memory:", *execute = NULL, *filename = NULL;
     const char *host = "127.0.0.1", *client_address = NULL;
-    bool json = false, server = false;
-    unsigned long port = 7373, max_clients = 64;
+    bool json = false, server = false, insecure_remote = false;
+    unsigned long port = 7373, max_clients = 32;
     for (int i = 1; i < argc; ++i) {
         const char *argument = argv[i];
         if (!strcmp(argument, "--help") || !strcmp(argument, "-h")) { usage(stdout); return 0; }
         if (!strcmp(argument, "--version")) { puts("AtlasDB " ADB_VERSION); return 0; }
         if (!strcmp(argument, "--json")) { json = true; continue; }
+        if (!strcmp(argument, "--insecure-remote")) { insecure_remote = true; continue; }
         if (!strcmp(argument, "--server")) {
             server = true;
             if (i + 1 < argc && argv[i + 1][0] != '-') {
@@ -397,10 +399,11 @@ int main(int argc, char **argv) {
         else if (!strcmp(argument, "--host")) host = argv[++i];
         else if (!strcmp(argument, "--client")) client_address = argv[++i];
         else if (!strcmp(argument, "--max-clients")) {
-            if (!parse_unsigned(argv[++i], 1, 1024, &max_clients)) goto invalid;
+            if (!parse_unsigned(argv[++i], 1, ADB_MAX_CLIENTS, &max_clients)) goto invalid;
         } else goto invalid;
     }
     if ((execute && filename) || (server && (execute || filename || client_address)) ||
+        (insecure_remote && !server) ||
         (client_address && (!execute || filename))) goto invalid;
     if (client_address) {
         char *copy = strdup(client_address);
@@ -422,7 +425,8 @@ int main(int argc, char **argv) {
     ADBDatabase *database = adb_open(directory, &error);
     if (!database) { print_error(&error, json); return 1; }
     if (server) {
-        int status = adb_run_server(database, host, (unsigned)port, (size_t)max_clients);
+        int status = adb_run_server(database, host, (unsigned)port, (size_t)max_clients,
+                                    insecure_remote);
         adb_close(database);
         return status;
     }
@@ -432,7 +436,11 @@ int main(int argc, char **argv) {
     FILE *input = stdin;
     bool close_input = false;
     if (execute) {
-        input = fmemopen((void *)execute, strlen(execute), "r");
+        /* glibc rejects a zero-sized fmemopen buffer; keep an empty -e a
+         * successful no-op while preserving the script framing contract. */
+        const char *source = *execute ? execute : " ";
+        size_t source_length = *execute ? strlen(execute) : 1;
+        input = fmemopen((void *)source, source_length, "r");
         close_input = true;
     } else if (filename && strcmp(filename, "-")) {
         input = fopen(filename, "rb");

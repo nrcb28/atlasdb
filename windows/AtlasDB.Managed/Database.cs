@@ -64,6 +64,7 @@ public sealed class Database : IDisposable
 public sealed class Session : IDisposable
 {
     public const int MaxSqlBytes = 1024 * 1024;
+    public const int MaxJsonBytes = 128 * 1024 * 1024;
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private readonly object gate = new();
     private readonly SessionHandle handle;

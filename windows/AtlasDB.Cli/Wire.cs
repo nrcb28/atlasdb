@@ -44,13 +44,16 @@ internal static class Wire
         using BufferedStream stream = new(client.GetStream());
         await WriteLine(stream, sql, token);
         // JSON can be larger than the 64 MiB native result budget due to escaping.
-        string json = await ReadLine(stream, 512 * 1024 * 1024, token) ?? throw new IOException("Respuesta vacia.");
+        string json = await ReadLine(stream, Session.MaxJsonBytes, token) ?? throw new IOException("Respuesta vacia.");
         Console.WriteLine(json);
         using JsonDocument document = JsonDocument.Parse(json);
         return document.RootElement.GetProperty("ok").GetBoolean() ? 0 : 1;
     }
-    internal static async Task Serve(Database database, IPAddress host, int port, int maxClients, CancellationToken token)
+    internal static async Task Serve(Database database, IPAddress host, int port, int maxClients,
+        bool insecureRemote, CancellationToken token)
     {
+        if (!insecureRemote && !IPAddress.IsLoopback(host))
+            throw new ArgumentException("Por seguridad, el servidor solo puede escuchar en loopback. Usa --insecure-remote únicamente detrás de una red protegida.");
         TcpListener listener = new(host, port);
         HashSet<Task> active = [];
         listener.Start(maxClients);

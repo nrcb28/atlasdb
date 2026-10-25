@@ -133,7 +133,16 @@ SELECT id,message FROM notes ORDER BY id;
         proc.communicate()
         raise AssertionError("server did not listen within 8 seconds")
 
+    def remote_bind_guard(self) -> None:
+        proc = subprocess.run(
+            [self.binary, "--server", "7373", "--host", "0.0.0.0"],
+            text=True, capture_output=True, timeout=10,
+        )
+        self.check(proc.returncode != 0 and "loopback" in proc.stderr,
+                   f"remote bind was not rejected: exit={proc.returncode}, stderr={proc.stderr}")
+
     def network(self) -> None:
+        self.remote_bind_guard()
         with tempfile.TemporaryDirectory(prefix="atlasdb-server-") as directory:
             proc, port = self.start_server(directory)
             first = second = None

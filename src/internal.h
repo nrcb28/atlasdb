@@ -13,6 +13,7 @@
 #define ADB_MAX_ROWS 1000000u
 #define ADB_MAX_EXPR_DEPTH 128u
 #define ADB_MAX_FRAME (256u * 1024u * 1024u)
+#define ADB_MAX_CLIENTS 128u
 
 bool adb_error(ADBError *error, ADBCode code, const char *format, ...);
 void *adb_alloc(size_t count, size_t size, ADBError *error);
@@ -29,7 +30,7 @@ bool adb_result_columns(ADBResult *result, size_t count, const char *const *name
 bool adb_result_row(ADBResult *result, const ADBValue *values, ADBError *error);
 bool adb_result_message(ADBResult *result, const char *format, ...);
 
-typedef struct { char *data; size_t length; size_t capacity; bool failed; } ADBBuffer;
+typedef struct { char *data; size_t length; size_t capacity; size_t maximum; bool failed; } ADBBuffer;
 bool adb_buffer_append(ADBBuffer *buffer, const void *data, size_t length);
 bool adb_buffer_printf(ADBBuffer *buffer, const char *format, ...);
 bool adb_buffer_json_string(ADBBuffer *buffer, const char *text);
@@ -135,7 +136,8 @@ struct ADBDatabase { pthread_mutex_t mutex; ADBState *state; ADBStorage storage;
 struct ADBSession { ADBDatabase *database; ADBState *transaction; uint64_t base_version; bool dirty; };
 
 /* Frontends share SQL script framing and bounded TCP protocol. */
-int adb_run_server(ADBDatabase *database, const char *host, unsigned port, size_t max_clients);
+int adb_run_server(ADBDatabase *database, const char *host, unsigned port, size_t max_clients,
+                   bool insecure_remote);
 int adb_run_client(const char *host, unsigned port, const char *sql);
 
 #endif
