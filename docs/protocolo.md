@@ -41,4 +41,4 @@ Para una transacción envía `BEGIN`, las operaciones y `COMMIT` sobre el mismo 
 
 El transporte impone límites de tamaño y tiempos de espera. Un cliente debe leer todas las respuestas, tratar desconexiones y considerar incierto el resultado de una operación si pierde la conexión antes de recibir su respuesta. Tras reiniciar, puede consultar los datos persistidos para resolver esa incertidumbre.
 
-El servidor es una herramienta local de desarrollo. Carece de TLS y control de acceso; exponerlo en una red requiere medidas externas y una revisión de seguridad.
+El servidor es una herramienta local de desarrollo. Carece de TLS y control de acceso; exponerlo en una red requiere una VPN, túnel SSH o proxy mTLS delante del proceso. Las conexiones sin actividad durante 5 segundos se cierran y una sentencia que supere 5 segundos recibe un error de límite.

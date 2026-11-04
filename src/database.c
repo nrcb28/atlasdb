@@ -1,4 +1,5 @@
 #include "internal.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -6,7 +7,7 @@ ADBDatabase *adb_open(const char *directory, ADBError *error) {
     if (error) memset(error, 0, sizeof(*error));
     ADBDatabase *database = adb_alloc(1, sizeof(*database), error);
     if (!database) return NULL;
-    database->storage.lock_fd = database->storage.wal_fd = -1;
+    database->storage.directory_fd = database->storage.lock_fd = database->storage.wal_fd = -1;
     if (pthread_mutex_init(&database->mutex, NULL) != 0) {
         adb_error(error, ADB_ERR_MEMORY, "Could not initialize database mutex");
         free(database);
@@ -67,6 +68,13 @@ static bool transaction_begin(ADBSession *session, ADBResult *result, ADBError *
     return true;
 }
 
+static void maybe_autocheckpoint(ADBDatabase *database) {
+    if (!database->storage.checkpoint_pending) return;
+    ADBError error = {0};
+    if (!adb_storage_checkpoint(&database->storage, database->state, &error))
+        fprintf(stderr, "Autocheckpoint deferred: %s\n", error.message);
+}
+
 static bool transaction_commit(ADBSession *session, ADBResult *result, ADBError *error) {
     if (!session->transaction) return adb_error(error, ADB_ERR_TRANSACTION, "No active transaction");
     if (!adb_result_message(result, session->dirty ? "Transaction committed" : "Read-only transaction committed")) return false;
@@ -93,6 +101,7 @@ static bool transaction_commit(ADBSession *session, ADBResult *result, ADBError 
         session->transaction = NULL;
         session->dirty = false;
         adb_state_free(old);
+        maybe_autocheckpoint(database);
     }
     pthread_mutex_unlock(&database->mutex);
     return ok;
@@ -132,6 +141,7 @@ static bool execute_regular(ADBSession *session, const ADBStatement *statement, 
                 ADBState *old = database->state;
                 database->state = working;
                 working = old;
+                maybe_autocheckpoint(database);
             }
         }
     }
@@ -146,9 +156,10 @@ bool adb_execute(ADBSession *session, const char *sql, ADBResult *result, ADBErr
     memset(result, 0, sizeof(*result));
     if (!session || !sql) return adb_error(error, ADB_ERR_SCHEMA, "Session and SQL are required");
     if (strnlen(sql, ADB_MAX_SQL + 1) > ADB_MAX_SQL) return adb_error(error, ADB_ERR_LIMIT, "SQL exceeds 1 MiB");
+    if (!adb_query_begin(error)) return false;
     ADBStatement *statement = adb_parse(sql, error);
-    if (!statement) return false;
-    bool ok;
+    bool ok = false;
+    if (!statement) goto done;
     switch (statement->kind) {
     case ST_BEGIN: ok = transaction_begin(session, result, error); break;
     case ST_COMMIT: ok = transaction_commit(session, result, error); break;
@@ -168,10 +179,12 @@ bool adb_execute(ADBSession *session, const char *sql, ADBResult *result, ADBErr
         break;
     default: ok = execute_regular(session, statement, result, error); break;
     }
+done:
     adb_statement_free(statement);
     if (!ok) {
         adb_result_free(result);
         if (error && error->code == ADB_OK) adb_error(error, ADB_ERR_MEMORY, "Could not allocate query result");
     }
+    adb_query_end();
     return ok;
 }

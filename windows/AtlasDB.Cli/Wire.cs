@@ -14,18 +14,24 @@ internal static class Wire
     {
         // A buffered stream wraps the connection to avoid one socket read per byte.
         using MemoryStream buffer = new();
-        byte[] one = new byte[1];
+        byte[] chunk = new byte[8192];
+        using CancellationTokenSource idle = CancellationTokenSource.CreateLinkedTokenSource(token);
         while (true)
         {
-            int count = await stream.ReadAsync(one, token);
+            idle.CancelAfter(TimeSpan.FromSeconds(5));
+            int count = await stream.ReadAsync(chunk, idle.Token);
             if (count == 0)
             {
                 if (buffer.Length == 0) return null;
                 throw new IOException("La conexion termino antes del salto de linea.");
             }
-            if (one[0] == (byte)'\n') return Utf8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length).TrimEnd('\r');
-            if (buffer.Length >= limit) throw new InvalidDataException("La linea supera el limite permitido.");
-            buffer.WriteByte(one[0]);
+            for (int i = 0; i < count; i++)
+            {
+                if (chunk[i] == (byte)'\n')
+                    return Utf8.GetString(buffer.GetBuffer(), 0, (int)buffer.Length).TrimEnd('\r');
+                if (buffer.Length >= limit) throw new InvalidDataException("La linea supera el limite permitido.");
+                buffer.WriteByte(chunk[i]);
+            }
         }
     }
     internal static async Task WriteLine(Stream stream, string text, CancellationToken token)

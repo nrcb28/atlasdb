@@ -42,5 +42,8 @@ jobs:
         if: github.event_name == 'push'
         with:
           name: AtlasDB-Windows-x64
-          path: build/windows-x64/
+          path: |
+            build/windows-x64/
+            build/AtlasDB-Windows-x64.zip
+            build/AtlasDB-Windows-x64.zip.sha256
           if-no-files-found: error

@@ -1,0 +1,45 @@
+name: Security analysis
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '23 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  static-and-sanitized:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Clang static analysis
+        run: |
+          set -eu
+          for source in src/*.c; do
+            clang --analyze -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc \
+              -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion \
+              -Xanalyzer -analyzer-output=text "$source"
+          done
+      - name: Address and undefined behavior sanitizers
+        run: make -j2 sanitize
+      - name: Secret pattern check
+        run: |
+          if git grep -n -I -E 'AKIA[0-9A-Z]{16}|BEGIN (RSA|EC|OPENSSH) PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{20,}'; then
+            echo 'Possible credential material found in the repository.' >&2
+            exit 1
+          fi
+
+  parser-fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Build parser fuzz target
+        run: |
+          mkdir -p build/fuzz-corpus
+          clang -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc -std=c17 -O1 -g \
+            -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer \
+            tests/fuzz_parser.c src/parser.c src/util.c src/model.c src/index.c -o build/fuzz-parser
+      - name: Run parser fuzz target
+        run: ./build/fuzz-parser -runs=10000 -max_len=65536 -rss_limit_mb=1024 build/fuzz-corpus

@@ -65,6 +65,7 @@ static bool like_match(const char *text, const char *pattern, bool *matches, ADB
     const char *star = NULL, *retry = NULL;
     size_t steps = 0;
     while (*text) {
+        if (!adb_query_check(err)) return false;
         if (++steps > 10000000u) return adb_error(err, ADB_ERR_LIMIT, "LIKE pattern requires too much work");
         if (*pattern == '%') { star = ++pattern; retry = text; }
         else if (*pattern == '_' || (*pattern && *pattern == *text)) { pattern++; text++; }
@@ -312,6 +313,7 @@ static bool insert_rows(ADBTable *t, const ADBStatement *s, ADBResult *r, bool *
         t->rows = grown; t->row_capacity = cap;
     }
     for (size_t i = 0; i < s->nvalue_rows; i++) {
+        if (!adb_query_check(err)) { free(columns); return false; }
         if (t->next_row_id == UINT64_MAX) { free(columns); return adb_error(err, ADB_ERR_LIMIT, "Row ID exhausted"); }
         ADBRow *row = &t->rows[t->nrows]; memset(row, 0, sizeof(*row));
         row->values = adb_alloc(t->ncolumns, sizeof(*row->values), err);
@@ -374,6 +376,7 @@ static bool candidates(const ADBTable *t, const ADBStatement *s, Candidate **out
     if (!list) return false;
     *count = 0;
     for (size_t i = 0; i < n; i++) {
+        if (!adb_query_check(err)) { free(list); return false; }
         const ADBRow *row = index ? find_row_id(t, ids[i]) : &t->rows[i];
         bool yes;
         if (!row) { free(list); return adb_error(err, ADB_ERR_CORRUPT, "Index points to missing row"); }
@@ -433,12 +436,15 @@ static bool evaluate_projection(const Projection *p, const ADBTable *t, const AD
     if (p->column >= 0) return adb_value_copy(value, &row->values[p->column], err);
     EvalContext ctx = {t, row}; return eval(p->expr, &ctx, value, err);
 }
-static void sort_merge(Candidate *list, Candidate *temp, size_t lo, size_t hi, bool desc) {
-    if (hi - lo < 2) return;
+static bool sort_merge(Candidate *list, Candidate *temp, size_t lo, size_t hi, bool desc, ADBError *err) {
+    if (!adb_query_check(err)) return false;
+    if (hi - lo < 2) return true;
     size_t mid = lo + (hi - lo) / 2;
-    sort_merge(list, temp, lo, mid, desc); sort_merge(list, temp, mid, hi, desc);
+    if (!sort_merge(list, temp, lo, mid, desc, err) ||
+        !sort_merge(list, temp, mid, hi, desc, err)) return false;
     size_t a = lo, b = mid, k = lo;
     while (a < mid && b < hi) {
+        if (!adb_query_check(err)) return false;
         int comparison = adb_value_compare(&list[a].order, &list[b].order);
         if (desc) comparison = -comparison;
         temp[k++] = comparison <= 0 ? list[a++] : list[b++];
@@ -446,6 +452,7 @@ static void sort_merge(Candidate *list, Candidate *temp, size_t lo, size_t hi, b
     while (a < mid) temp[k++] = list[a++];
     while (b < hi) temp[k++] = list[b++];
     memcpy(list + lo, temp + lo, (hi - lo) * sizeof(*list));
+    return true;
 }
 static bool order_candidates(Candidate *list, size_t count, const ADBTable *t, const ADBStatement *s,
                              const Projection *p, size_t nprojections, bool isagg, ADBError *err) {
@@ -456,13 +463,15 @@ static bool order_candidates(Candidate *list, size_t count, const ADBTable *t, c
     if (projection < 0 && (column < 0 || isagg)) return adb_error(err, ADB_ERR_SCHEMA, "Unknown ORDER BY column '%s'", s->order_column);
     if (isagg) return true;
     for (size_t i = 0; i < count; i++) {
+        if (!adb_query_check(err)) return false;
         if (projection >= 0) {
             if (!evaluate_projection(&p[projection], t, list[i].row, &list[i].order, err)) return false;
         } else if (!adb_value_copy(&list[i].order, &list[i].row->values[column], err)) return false;
     }
     Candidate *temp = adb_alloc(count ? count : 1, sizeof(*temp), err);
     if (!temp) return false;
-    sort_merge(list, temp, 0, count, s->order_desc); free(temp); return true;
+    bool sorted = sort_merge(list, temp, 0, count, s->order_desc, err);
+    free(temp); return sorted;
 }
 static bool aggregate_value(const ADBExpr *e, const ADBTable *t, const Candidate *list,
                             size_t count, ADBValue *out, ADBError *err) {
@@ -472,6 +481,7 @@ static bool aggregate_value(const ADBExpr *e, const ADBTable *t, const Candidate
     uint64_t seen = 0; long double mean = 0.0L;
     *out = adb_null();
     for (size_t i = 0; i < count; i++) {
+        if (!adb_query_check(err)) return false;
         ADBValue v = adb_null();
         if (iscount && e->left->kind == EX_STAR) v = integer_value(1);
         else {
@@ -561,6 +571,7 @@ static bool update_rows(ADBTable *t, const ADBStatement *s, ADBResult *r, bool *
     }
     uint64_t count = 0;
     for (size_t i = 0; i < t->nrows; i++) {
+        if (!adb_query_check(err)) { free(columns); return false; }
         bool yes;
         if (!matches(s->where, t, &t->rows[i], &yes, err)) { free(columns); return false; }
         if (!yes) continue;
@@ -590,11 +601,13 @@ static bool delete_rows(ADBTable *t, const ADBStatement *s, ADBResult *r, bool *
     if (!remove) return false;
     size_t count = 0;
     for (size_t i = 0; i < t->nrows; i++) {
+        if (!adb_query_check(err)) { free(remove); return false; }
         if (!matches(s->where, t, &t->rows[i], &remove[i], err)) { free(remove); return false; }
         count += remove[i];
     }
     size_t write = 0;
     for (size_t i = 0; i < t->nrows; i++) {
+        if (!adb_query_check(err)) { free(remove); return false; }
         if (remove[i]) {
             for (size_t j = 0; j < t->ncolumns; j++) adb_value_free(&t->rows[i].values[j]);
             free(t->rows[i].values);

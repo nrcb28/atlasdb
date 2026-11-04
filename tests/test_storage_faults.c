@@ -9,12 +9,12 @@
 #include <unistd.h>
 
 /* Link this executable with GNU ld --wrap=write,--wrap=fsync,
- * --wrap=ftruncate,--wrap=rename. Failures are scoped to one API operation;
+ * --wrap=ftruncate,--wrap=renameat. Failures are scoped to one API operation;
  * setup, assertions, cleanup, and recovery always use real system calls. */
 ssize_t __real_write(int fd, const void *bytes, size_t length);
 int __real_fsync(int fd);
 int __real_ftruncate(int fd, off_t length);
-int __real_rename(const char *source, const char *destination);
+int __real_renameat(int source_fd, const char *source, int destination_fd, const char *destination);
 
 typedef struct {
     bool enabled;
@@ -61,9 +61,9 @@ int __wrap_ftruncate(int fd, off_t length) {
     if (faults.enabled && fail_call(faults.truncate_fail, ++faults.truncates, EIO)) return -1;
     return __real_ftruncate(fd, length);
 }
-int __wrap_rename(const char *source, const char *destination) {
+int __wrap_renameat(int source_fd, const char *source, int destination_fd, const char *destination) {
     if (faults.enabled && fail_call(faults.rename_fail, ++faults.renames, EIO)) return -1;
-    return __real_rename(source, destination);
+    return __real_renameat(source_fd, source, destination_fd, destination);
 }
 static void arm(Faults plan) { faults = plan; faults.enabled = true; }
 static unsigned disarm(void) { faults.enabled = false; return faults.injected; }

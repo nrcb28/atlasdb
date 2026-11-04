@@ -51,7 +51,7 @@ static async Task<int> Run(string[] args)
                     ".help" => null,
                     ".tables" => "SHOW TABLES;",
                     ".checkpoint" => "CHECKPOINT;",
-                    _ when line.StartsWith(".schema ") => "DESCRIBE \"" + line[8..].Trim().Replace("\"", "\"\"") + "\";",
+                    _ when line.StartsWith(".schema ", StringComparison.Ordinal) => "DESCRIBE \"" + line[8..].Trim().Replace("\"", "\"\"") + "\";",
                     _ => ""
                 };
                 if (command is null) Help();
@@ -128,6 +128,9 @@ sealed class Options
     {
         Options value = new();
         HashSet<string> seen = [];
+        static int Number(string text, string option) =>
+            int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int number)
+                ? number : throw new ArgumentException($"Valor invalido para {option}.");
         for (int i = 0; i < args.Length; i++)
         {
             string flag = args[i];
@@ -139,9 +142,9 @@ sealed class Options
                 case "--execute": value.Execute = Next(); break;
                 case "--file": value.File = Next(); break;
                 case "--client": value.Client = Next(); break;
-                case "--server": value.Port = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--server": value.Port = Number(Next(), "--server"); break;
                 case "--host": value.Host = Next(); break;
-                case "--max-clients": value.MaxClients = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--max-clients": value.MaxClients = Number(Next(), "--max-clients"); break;
                 case "--insecure-remote": value.InsecureRemote = true; break;
                 case "--json": value.Json = true; break;
                 case "--help": case "-h": value.Help = true; break;

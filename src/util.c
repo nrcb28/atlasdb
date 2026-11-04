@@ -6,6 +6,41 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+static _Thread_local struct timespec query_deadline;
+static _Thread_local unsigned query_ticks;
+static _Thread_local bool query_active;
+
+bool adb_query_begin(ADBError *error) {
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+        return adb_error(error, ADB_ERR_IO, "Unable to start query timer");
+    query_deadline = now;
+    query_deadline.tv_sec += ADB_QUERY_TIMEOUT_SECONDS;
+    query_ticks = 0;
+    query_active = true;
+    return true;
+}
+
+bool adb_query_check(ADBError *error) {
+    if (!query_active) return true;
+    if ((++query_ticks & 1023u) != 0) return true;
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+        return adb_error(error, ADB_ERR_IO, "Unable to read query timer");
+    if (now.tv_sec > query_deadline.tv_sec ||
+        (now.tv_sec == query_deadline.tv_sec && now.tv_nsec >= query_deadline.tv_nsec))
+        return adb_error(error, ADB_ERR_LIMIT, "Query exceeded the %u-second execution limit",
+                         ADB_QUERY_TIMEOUT_SECONDS);
+    return true;
+}
+
+void adb_query_end(void) {
+    memset(&query_deadline, 0, sizeof(query_deadline));
+    query_ticks = 0;
+    query_active = false;
+}
 
 bool adb_error(ADBError *error, ADBCode code, const char *format, ...) {
     if (error) {

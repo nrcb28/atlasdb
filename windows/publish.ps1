@@ -11,4 +11,6 @@ Copy-Item "$PSScriptRoot/../examples/*.sql" "$target/examples/"
 $archive = Join-Path $PSScriptRoot "../build/AtlasDB-Windows-x64.zip"
 if (Test-Path $archive) { Remove-Item $archive }
 Compress-Archive -Path "$target/*" -DestinationPath $archive
-Get-FileHash $archive -Algorithm SHA256
+$hash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+"$hash  $([IO.Path]::GetFileName($archive))" | Set-Content "$archive.sha256" -Encoding ascii
+Write-Host "SHA256 ($archive) = $hash"

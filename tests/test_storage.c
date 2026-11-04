@@ -208,6 +208,13 @@ static void disk_tests(void) {
     adb_storage_close(&storage); adb_state_free(state);
     fd = open(snapshot, O_WRONLY | O_APPEND); CHECK(fd >= 0); CHECK(write(fd, "x", 1) == 1); CHECK(close(fd) == 0);
     CHECK(!adb_storage_open(&storage, directory, &state, &error) && error.code == ADB_ERR_CORRUPT); CHECK(state == NULL);
+    char alias[512];
+    int alias_length = snprintf(alias, sizeof(alias), "%s-link", directory);
+    CHECK(alias_length > 0 && (size_t)alias_length < sizeof(alias));
+    CHECK(symlink(directory, alias) == 0);
+    ADBState *alias_state = NULL;
+    CHECK(!adb_storage_open(&storage, alias, &alias_state, &error) && error.code == ADB_ERR_IO && alias_state == NULL);
+    CHECK(unlink(alias) == 0);
     cleanup(directory);
 }
 
