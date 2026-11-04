@@ -51,7 +51,7 @@ static async Task<int> Run(string[] args)
                     ".help" => null,
                     ".tables" => "SHOW TABLES;",
                     ".checkpoint" => "CHECKPOINT;",
-                    _ when line.StartsWith(".schema ") => "DESCRIBE \"" + line[8..].Trim().Replace("\"", "\"\"") + "\";",
+                    _ when line.StartsWith(".schema ", StringComparison.Ordinal) => "DESCRIBE \"" + line[8..].Trim().Replace("\"", "\"\"") + "\";",
                     _ => ""
                 };
                 if (command is null) Help();
