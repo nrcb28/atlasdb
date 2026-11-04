@@ -47,6 +47,13 @@ static inline int adb_win_stat(const char *path, struct _stat64 *info) {
     wchar_t *wide = adb_win_path(path); if (!wide) return -1;
     int rc = _wstat64(wide, info); free(wide); return rc;
 }
+static inline DWORD adb_win_path_attributes(const char *path) {
+    wchar_t *wide = adb_win_path(path);
+    if (!wide) { SetLastError(ERROR_INVALID_NAME); return INVALID_FILE_ATTRIBUTES; }
+    DWORD attributes = GetFileAttributesW(wide);
+    free(wide);
+    return attributes;
+}
 static inline int adb_win_unlink(const char *path) {
     wchar_t *wide = adb_win_path(path); if (!wide) return -1;
     int rc = _wunlink(wide); free(wide); return rc;

@@ -145,6 +145,11 @@ SELECT id,message FROM notes ORDER BY id;
         self.remote_bind_guard()
         with tempfile.TemporaryDirectory(prefix="atlasdb-server-") as directory:
             proc, port = self.start_server(directory)
+            idle = socket.create_connection(("127.0.0.1", port), timeout=8)
+            idle.settimeout(8)
+            idle_response = idle.recv(4096)
+            idle.close()
+            self.check(b"inactiva" in idle_response, "idle TCP connection was not closed")
             first = second = None
             try:
                 first = socket.create_connection(("127.0.0.1", port), timeout=4)

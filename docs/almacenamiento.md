@@ -2,6 +2,8 @@
 
 `adb_open(":memory:", ...)` crea una base sin archivos. Cualquier otro nombre representa un directorio persistente, que AtlasDB crea si es necesario.
 
+En POSIX, el directorio persistente debe pertenecer al usuario que ejecuta el proceso y no conceder permisos a grupo u otros usuarios (`0700` o más restrictivo). AtlasDB rechaza directorios finales que sean enlaces simbólicos y abre sus archivos con `openat`/`O_NOFOLLOW`; en Windows también rechaza puntos de reanálisis. Esto evita que una ruta de almacenamiento redirija silenciosamente el WAL o el snapshot a otra ubicación.
+
 | Archivo | Uso |
 |---|---|
 | `atlas.lock` | Bloqueo exclusivo del directorio |
@@ -30,7 +32,7 @@ CRC32 permite detectar daños accidentales; no es una firma criptográfica.
 
 ## Commit
 
-Una escritura valida un estado privado y lo serializa completamente. El almacenamiento añade una trama al WAL y sincroniza el archivo antes de devolver éxito al runtime. Después se publica el nuevo estado confirmado en memoria. Así, un commit reconocido puede recuperarse sin depender de un cierre limpio del proceso.
+Una escritura valida un estado privado y lo serializa completamente. El almacenamiento añade una trama al WAL y sincroniza el archivo antes de devolver éxito al runtime. Después se publica el nuevo estado confirmado en memoria. Así, un commit reconocido puede recuperarse sin depender de un cierre limpio del proceso. El WAL tiene un límite de seguridad de 1 GiB y solicita un checkpoint automático al superar 512 MiB; si el checkpoint automático falla, el commit sigue siendo durable y se reintenta en la siguiente escritura.
 
 Los registros contienen imágenes completas, no cambios incrementales. Una transacción que modifica una fila puede escribir toda la base. El WAL crece con cada commit hasta que se ejecuta `CHECKPOINT`; planifica checkpoints según el tamaño y la frecuencia de escritura.
 

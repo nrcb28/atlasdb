@@ -5,6 +5,13 @@ CPPFLAGS += -D_POSIX_C_SOURCE=200809L -Iinclude -Isrc
 CFLAGS ?= -O2 -g
 CFLAGS += -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion
 LDLIBS += -pthread -lm
+HARDENING ?= 1
+
+ifeq ($(HARDENING),1)
+CPPFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3
+CFLAGS += -fstack-protector-strong -fPIE
+LDFLAGS += -pie -Wl,-z,relro,-z,now -Wl,-z,noexecstack
+endif
 
 LIB_SRC = src/util.c src/parser.c src/index.c src/model.c src/engine.c src/storage.c src/database.c
 LIB_OBJ = $(LIB_SRC:src/%.c=$(BUILD)/%.o)
@@ -38,7 +45,7 @@ $(BUILD)/test_runtime_alloc: tests/test_runtime_alloc.c $(BUILD)/libatlasdb.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $< $(BUILD)/libatlasdb.a $(LDLIBS) -Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc,--wrap=free -o $@
 
 $(BUILD)/test_storage_faults: tests/test_storage_faults.c $(BUILD)/libatlasdb.a
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $< $(BUILD)/libatlasdb.a $(LDLIBS) -Wl,--wrap=write,--wrap=fsync,--wrap=ftruncate,--wrap=rename -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $< $(BUILD)/libatlasdb.a $(LDLIBS) -Wl,--wrap=write,--wrap=fsync,--wrap=ftruncate,--wrap=renameat -o $@
 
 $(BUILD)/embed: examples/embed.c $(BUILD)/libatlasdb.a
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) $< $(BUILD)/libatlasdb.a $(LDLIBS) -o $@
@@ -73,7 +80,7 @@ differential:
 check: test test-oom test-faults differential
 
 sanitize:
-	$(MAKE) BUILD=build/sanitize CFLAGS='-O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie' LDFLAGS='-fsanitize=address,undefined -no-pie' test
+	$(MAKE) BUILD=build/sanitize HARDENING=0 CFLAGS='-O1 -g -std=c17 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie' LDFLAGS='-fsanitize=address,undefined -no-pie' test
 
 examples: all
 	$(BUILD)/atlasdb --file examples/demo.sql

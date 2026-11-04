@@ -14,6 +14,10 @@
 #define ADB_MAX_EXPR_DEPTH 128u
 #define ADB_MAX_FRAME (256u * 1024u * 1024u)
 #define ADB_MAX_CLIENTS 128u
+#define ADB_QUERY_TIMEOUT_SECONDS 5u
+#define ADB_CLIENT_IDLE_SECONDS 5u
+#define ADB_MAX_WAL_BYTES (1024u * 1024u * 1024u)
+#define ADB_AUTOCHECKPOINT_BYTES (512u * 1024u * 1024u)
 
 bool adb_error(ADBError *error, ADBCode code, const char *format, ...);
 void *adb_alloc(size_t count, size_t size, ADBError *error);
@@ -35,6 +39,9 @@ bool adb_buffer_append(ADBBuffer *buffer, const void *data, size_t length);
 bool adb_buffer_printf(ADBBuffer *buffer, const char *format, ...);
 bool adb_buffer_json_string(ADBBuffer *buffer, const char *text);
 void adb_buffer_free(ADBBuffer *buffer);
+bool adb_query_begin(ADBError *error);
+bool adb_query_check(ADBError *error);
+void adb_query_end(void);
 
 /* SQL abstract syntax tree. Parser owns every string, value, and child node. */
 typedef enum { EX_LITERAL, EX_COLUMN, EX_UNARY, EX_BINARY, EX_FUNCTION, EX_STAR } ADBExprKind;
@@ -123,7 +130,14 @@ bool adb_engine_execute(ADBState *state, const ADBStatement *statement, ADBResul
 bool adb_statement_writes(const ADBStatement *statement);
 
 /* Durable storage: checksummed full-state WAL records and atomic checkpoint. */
-typedef struct { char *directory; int lock_fd; int wal_fd; bool memory; } ADBStorage;
+typedef struct {
+    char *directory;
+    int directory_fd;
+    int lock_fd;
+    int wal_fd;
+    bool memory;
+    bool checkpoint_pending;
+} ADBStorage;
 bool adb_storage_open(ADBStorage *storage, const char *directory, ADBState **state, ADBError *error);
 void adb_storage_close(ADBStorage *storage);
 bool adb_storage_commit(ADBStorage *storage, const ADBState *state, ADBError *error);

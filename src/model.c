@@ -102,6 +102,7 @@ static bool copy_table(ADBTable *dest, const ADBTable *source, ADBError *error)
     dest->columns = adb_alloc(dest->ncolumns, sizeof(*dest->columns), error);
     if (!dest->columns) return false;
     for (size_t c = 0; c < dest->ncolumns; c++) {
+        if (!adb_query_check(error)) return false;
         if (!adb_column_copy(&dest->columns[c], &source->columns[c], error))
             return false;
     }
@@ -110,11 +111,13 @@ static bool copy_table(ADBTable *dest, const ADBTable *source, ADBError *error)
         if (!dest->rows) return false;
         dest->row_capacity = dest->nrows = source->nrows;
         for (size_t r = 0; r < dest->nrows; r++) {
+            if (!adb_query_check(error)) return false;
             dest->rows[r].id = source->rows[r].id;
             dest->rows[r].values = adb_alloc(dest->ncolumns,
                                             sizeof(*dest->rows[r].values), error);
             if (!dest->rows[r].values) return false;
             for (size_t c = 0; c < dest->ncolumns; c++) {
+                if (!adb_query_check(error)) return false;
                 if (!adb_value_copy(&dest->rows[r].values[c],
                                     &source->rows[r].values[c], error)) return false;
             }
@@ -125,6 +128,7 @@ static bool copy_table(ADBTable *dest, const ADBTable *source, ADBError *error)
         if (!dest->indexes) return false;
         dest->nindexes = source->nindexes;
         for (size_t i = 0; i < dest->nindexes; i++) {
+            if (!adb_query_check(error)) return false;
             dest->indexes[i].name = adb_strdup(source->indexes[i].name, error);
             if (!dest->indexes[i].name) return false;
             dest->indexes[i].column = source->indexes[i].column;
@@ -149,6 +153,7 @@ ADBState *adb_state_clone(const ADBState *state, ADBError *error)
         if (!copy->tables) goto failure;
         copy->ntables = state->ntables;
         for (size_t t = 0; t < copy->ntables; t++) {
+            if (!adb_query_check(error)) goto failure;
             if (!copy_table(&copy->tables[t], &state->tables[t], error)) goto failure;
         }
     }
@@ -226,21 +231,25 @@ bool adb_table_reindex(ADBTable *table, ADBError *error)
         (table->nrows && table->next_row_id <= table->rows[table->nrows - 1].id))
         return adb_error(error, ADB_ERR_SCHEMA, "invalid next row ID");
     for (size_t i = 0; i < table->nindexes; i++) {
+        if (!adb_query_check(error)) return false;
         adb_tree_free(table->indexes[i].tree);
         table->indexes[i].tree = NULL;
     }
     for (size_t i = 0; i < table->nindexes; i++) {
+        if (!adb_query_check(error)) return false;
         ADBIndex *index = &table->indexes[i];
         if (!index->name || index->column >= table->ncolumns)
             return adb_error(error, ADB_ERR_SCHEMA, "invalid index definition");
         index->tree = adb_tree_create(error);
         if (!index->tree) return false;
         for (size_t r = 0; r < table->nrows; r++) {
+            if (!adb_query_check(error)) return false;
             if (!adb_tree_insert(index->tree, &table->rows[r].values[index->column],
                                  table->rows[r].id, index->unique, error)) return false;
         }
     }
     for (size_t c = 0; c < table->ncolumns; c++) {
+        if (!adb_query_check(error)) return false;
         if ((table->columns[c].primary_key || table->columns[c].unique) &&
             !validate_column_unique(table, c, error)) return false;
     }

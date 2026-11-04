@@ -20,3 +20,8 @@ email address listed on the GitHub profile and include:
 Reports will be acknowledged as soon as practical. This project is educational
 and the TCP server is not intended for untrusted networks; unauthenticated or
 unencrypted network exposure should be included in the impact assessment.
+
+The TCP protocol intentionally does not implement TLS or authentication. Keep
+the listener on loopback, or put an authenticated TLS/VPN/SSH boundary in
+front of it before using `--insecure-remote`. Do not treat that flag as a
+production security control.

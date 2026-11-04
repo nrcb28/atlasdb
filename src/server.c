@@ -137,16 +137,22 @@ static void *serve_connection(void *argument) {
     } else {
         char chunk[8192];
         size_t length = 0;
-        time_t started = monotonic_seconds();
+         time_t line_started = monotonic_seconds(), last_activity = line_started;
         bool connected = true;
         while (connected && !atomic_load_explicit(&server->stopping, memory_order_relaxed)) {
-            if (monotonic_seconds() - started >= 60) {
-                (void)send_error(worker->fd, ADB_ERR_LIMIT, "Tiempo de espera agotado (60 segundos)");
+            time_t now = monotonic_seconds();
+            if (now - last_activity >= ADB_CLIENT_IDLE_SECONDS) {
+                (void)send_error(worker->fd, ADB_ERR_LIMIT, "Conexion inactiva demasiado tiempo");
+                break;
+            }
+            if (now - line_started >= 30) {
+                (void)send_error(worker->fd, ADB_ERR_LIMIT, "Comando agotado (limite: 30 segundos)");
                 break;
             }
             ssize_t count = recv(worker->fd, chunk, sizeof(chunk), 0);
             if (count < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)) continue;
             if (count <= 0) break;
+            last_activity = monotonic_seconds();
             for (ssize_t i = 0; i < count; ++i) {
                 unsigned char c = (unsigned char)chunk[i];
                 if (c == '\n') {
@@ -154,7 +160,7 @@ static void *serve_connection(void *argument) {
                     line[length] = '\0';
                     connected = execute_line(worker->fd, session, line);
                     length = 0;
-                    started = monotonic_seconds();
+                    line_started = last_activity = monotonic_seconds();
                     if (!connected) break;
                 } else if (c == '\0') {
                     (void)send_error(worker->fd, ADB_ERR_PARSE, "Un comando no puede contener bytes NUL");

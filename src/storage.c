@@ -388,10 +388,9 @@ static bool sync_directory(const ADBStorage *storage, ADBError *error) {
     (void)storage; (void)error;
     return true;
 #else
-    int fd = open(storage->directory, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-    if (fd < 0) return io_error(error, "open database directory");
-    bool ok = sync_file(fd);
-    int saved = errno; close(fd); errno = saved;
+    if (storage->directory_fd < 0) return adb_error(error, ADB_ERR_IO, "database directory is unavailable");
+    bool ok = sync_file(storage->directory_fd);
+    int saved = errno; errno = saved;
     return ok || io_error(error, "sync database directory");
 #endif
 }
@@ -417,6 +416,19 @@ static bool sync_parent_directory(const ADBStorage *storage, ADBError *error) {
     return ok || io_error(error, "sync parent directory");
 #endif
 }
+#ifdef _WIN32
+static bool reject_reparse_point(const char *path, ADBError *error) {
+    DWORD attributes = adb_win_path_attributes(path);
+    if (attributes == INVALID_FILE_ATTRIBUTES) {
+        DWORD status = GetLastError();
+        if (status == ERROR_FILE_NOT_FOUND || status == ERROR_PATH_NOT_FOUND) return true;
+        return adb_error(error, ADB_ERR_IO, "cannot inspect database storage path");
+    }
+    if (attributes & FILE_ATTRIBUTE_REPARSE_POINT)
+        return adb_error(error, ADB_ERR_IO, "reparse points are not allowed in database storage");
+    return true;
+}
+#endif
 static void frame_header(unsigned char header[FRAME_SIZE], const unsigned char *payload, size_t length) {
     memcpy(header, frame_magic, sizeof(frame_magic));
     put32(header + 8, 1); put32(header + 12, FRAME_SIZE); put64(header + 16, length);
@@ -482,7 +494,8 @@ static bool recover_file(int fd, bool snapshot, ADBState **state, off_t *valid_e
 }
 
 bool adb_storage_open(ADBStorage *storage, const char *directory, ADBState **state, ADBError *error) {
-    memset(storage, 0, sizeof(*storage)); storage->lock_fd = storage->wal_fd = -1;
+    memset(storage, 0, sizeof(*storage));
+    storage->directory_fd = storage->lock_fd = storage->wal_fd = -1;
     *state = NULL;
     if (!directory || !*directory) return adb_error(error, ADB_ERR_IO, "database directory must not be empty");
     storage->memory = strcmp(directory, ":memory:") == 0;
@@ -492,16 +505,35 @@ bool adb_storage_open(ADBStorage *storage, const char *directory, ADBState **sta
     bool created = mkdir(directory, 0700) == 0;
     if (!created && errno != EEXIST) { io_error(error, "create database directory"); goto fail; }
     struct stat info;
+#ifdef _WIN32
+    if (!reject_reparse_point(directory, error)) goto fail;
     if (stat(directory, &info) < 0) { io_error(error, "inspect database directory"); goto fail; }
+#else
+    if (lstat(directory, &info) < 0) { io_error(error, "inspect database directory"); goto fail; }
+#endif
     if (!S_ISDIR(info.st_mode)) { adb_error(error, ADB_ERR_IO, "database path is not a directory"); goto fail; }
+#ifndef _WIN32
+    if (info.st_uid != geteuid() || (info.st_mode & 0077u) != 0)
+        { adb_error(error, ADB_ERR_IO, "database directory must be private and owned by the current user"); goto fail; }
+    storage->directory_fd = open(directory, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+    if (storage->directory_fd < 0) { io_error(error, "open database directory"); goto fail; }
+#endif
+#ifdef _WIN32
     char *path = storage_path(storage, "atlas.lock", error);
-    if (!path) goto fail;
+    if (!path || !reject_reparse_point(path, error)) { free(path); goto fail; }
     storage->lock_fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600); free(path);
+#else
+    storage->lock_fd = openat(storage->directory_fd, "atlas.lock", O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
+#endif
     if (storage->lock_fd < 0) { io_error(error, "open database lock"); goto fail; }
     if (flock(storage->lock_fd, LOCK_EX | LOCK_NB) < 0) { io_error(error, "database directory is already locked"); goto fail; }
+#ifdef _WIN32
     path = storage_path(storage, "atlas.snapshot", error);
-    if (!path) goto fail;
+    if (!path || !reject_reparse_point(path, error)) { free(path); goto fail; }
     int snapshot_fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW); free(path);
+#else
+    int snapshot_fd = openat(storage->directory_fd, "atlas.snapshot", O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+#endif
     if (snapshot_fd < 0 && errno != ENOENT) { io_error(error, "open snapshot"); goto fail; }
     if (snapshot_fd >= 0) {
         off_t valid_end;
@@ -509,9 +541,13 @@ bool adb_storage_open(ADBStorage *storage, const char *directory, ADBState **sta
         close(snapshot_fd);
         if (!ok) goto fail;
     }
+#ifdef _WIN32
     path = storage_path(storage, "atlas.wal", error);
-    if (!path) goto fail;
+    if (!path || !reject_reparse_point(path, error)) { free(path); goto fail; }
     storage->wal_fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600); free(path);
+#else
+    storage->wal_fd = openat(storage->directory_fd, "atlas.wal", O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
+#endif
     if (storage->wal_fd < 0) { io_error(error, "open WAL"); goto fail; }
     off_t valid_end = 0;
     if (!recover_file(storage->wal_fd, false, state, &valid_end, error)) goto fail;
@@ -533,9 +569,11 @@ fail:
 void adb_storage_close(ADBStorage *storage) {
     if (!storage) return;
     if (storage->wal_fd >= 0) close(storage->wal_fd);
+    if (storage->directory_fd >= 0) close(storage->directory_fd);
     if (storage->lock_fd >= 0) close(storage->lock_fd);
     free(storage->directory);
-    memset(storage, 0, sizeof(*storage)); storage->lock_fd = storage->wal_fd = -1;
+    memset(storage, 0, sizeof(*storage));
+    storage->directory_fd = storage->lock_fd = storage->wal_fd = -1;
 }
 
 bool adb_storage_commit(ADBStorage *storage, const ADBState *state, ADBError *error) {
@@ -546,9 +584,18 @@ bool adb_storage_commit(ADBStorage *storage, const ADBState *state, ADBError *er
     frame_header(header, payload, length);
     off_t start = lseek(storage->wal_fd, 0, SEEK_END);
     if (start < 0) { free(payload); return io_error(error, "seek WAL before commit"); }
+    if ((uintmax_t)start > (uintmax_t)ADB_MAX_WAL_BYTES - FRAME_SIZE ||
+        length > ADB_MAX_WAL_BYTES - (size_t)start - FRAME_SIZE) {
+        free(payload);
+        return adb_error(error, ADB_ERR_LIMIT, "WAL exceeds its %u-byte safety limit; run CHECKPOINT",
+                         ADB_MAX_WAL_BYTES);
+    }
     bool ok = write_all(storage->wal_fd, header, sizeof(header)) && write_all(storage->wal_fd, payload, length) && sync_file(storage->wal_fd);
     int saved = errno; free(payload);
-    if (ok) return true;
+    if (ok) {
+        storage->checkpoint_pending = (uintmax_t)start + FRAME_SIZE + length >= ADB_AUTOCHECKPOINT_BYTES;
+        return true;
+    }
     /* If append/fsync fails, remove the attempted record before permitting any
      * further write. Failure of this rollback poisons the backend; durability
      * after a hard IO failure cannot be inferred by the in-memory caller. */
@@ -571,14 +618,25 @@ bool adb_storage_checkpoint(ADBStorage *storage, const ADBState *state, ADBError
     bool ok = false;
     if (!temporary || !destination || !adb_state_encode(state, &payload, &length, error)) goto done;
     frame_header(header, payload, length);
+#ifdef _WIN32
+    if (!reject_reparse_point(temporary, error) || !reject_reparse_point(destination, error)) goto done;
     fd = open(temporary, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
+#else
+    fd = openat(storage->directory_fd, "atlas.snapshot.tmp", O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
+#endif
     if (fd < 0) { io_error(error, "create checkpoint file"); goto done; }
     if (!write_all(fd, header, sizeof(header)) || !write_all(fd, payload, length) || !sync_file(fd)) {
         io_error(error, "write checkpoint file"); goto done;
     }
     if (close(fd) < 0) { fd = -1; io_error(error, "close checkpoint file"); goto done; }
     fd = -1;
+#ifdef _WIN32
     if (rename(temporary, destination) < 0) { io_error(error, "publish checkpoint"); goto done; }
+#else
+    if (renameat(storage->directory_fd, "atlas.snapshot.tmp", storage->directory_fd, "atlas.snapshot") < 0) {
+        io_error(error, "publish checkpoint"); goto done;
+    }
+#endif
     /* The directory barrier makes the snapshot durable before WAL destruction.
      * A crash before WAL truncation may leave redundant records, which recovery
      * safely ignores when their versions do not exceed the snapshot version. */
@@ -587,9 +645,16 @@ bool adb_storage_checkpoint(ADBStorage *storage, const ADBState *state, ADBError
         io_error(error, "reset WAL after checkpoint"); goto done;
     }
     ok = true;
+    storage->checkpoint_pending = false;
 done:
     if (fd >= 0) close(fd);
-    if (!ok && temporary) unlink(temporary);
+    if (!ok && temporary) {
+#ifdef _WIN32
+        unlink(temporary);
+#else
+        unlinkat(storage->directory_fd, "atlas.snapshot.tmp", 0);
+#endif
+    }
     free(temporary); free(destination); free(payload);
     return ok;
 }

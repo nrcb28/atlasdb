@@ -517,7 +517,7 @@ static bool parse_column(Parser *parser, ADBColumn *column)
     else if (take_keyword(parser, "TEXT") || take_keyword(parser, "VARCHAR")) {
         column->type = ADB_TEXT;
         if (take(parser, TK_LPAREN)) {
-            uint64_t width;
+            uint64_t width = 0;
             if (!unsigned_integer(parser, &width)) return false;
             if (width == 0 || width > ADB_MAX_TEXT) return fail(parser, ADB_ERR_LIMIT, "Text width exceeds its size limit");
             if (!expect(parser, TK_RPAREN, "Expected ')' after text width")) return false;
