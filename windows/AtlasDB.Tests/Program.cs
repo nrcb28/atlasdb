@@ -5,11 +5,11 @@ int checks = 0;
 void Check(bool value, string message)
 {
     checks++;
-    if (!value) throw new Exception($"Fallo {checks}: {message}");
+    if (!value) throw new InvalidOperationException($"Fallo {checks}: {message}");
 }
 void Error(Action action, int expected)
 {
-    try { action(); throw new Exception("Se esperaba error SQL"); }
+    try { action(); throw new InvalidOperationException("Se esperaba error SQL"); }
     catch (AtlasException failure) { Check(failure.Code == expected, $"Codigo {failure.Code}, esperado {expected}"); }
 }
 long Scalar(Session session, string sql) => session.Execute(sql).GetProperty("rows")[0][0].GetInt64();
@@ -48,7 +48,7 @@ using (Session survivor = owner.CreateSession())
     owner.Dispose();
     survivor.Execute("CREATE TABLE vivo (id INTEGER)");
     Check(Scalar(survivor, "SELECT COUNT(*) FROM vivo") == 0, "Vida de la base retenida por sesion");
-    try { owner.CreateSession(); throw new Exception("Base cerrada acepto sesion nueva"); }
+    try { owner.CreateSession(); throw new InvalidOperationException("Base cerrada acepto sesion nueva"); }
     catch (ObjectDisposedException) { checks++; }
 }
 using (Database concurrent = new())
@@ -70,7 +70,7 @@ try
     {
         session.Execute("CREATE TABLE datos (id INTEGER PRIMARY KEY, texto TEXT)");
         session.Execute("INSERT INTO datos VALUES (1,'persistencia ñ 日本語')");
-        try { using Database locked = new(path); throw new Exception("Fallo de bloqueo exclusivo"); }
+        try { using Database locked = new(path); throw new InvalidOperationException("Fallo de bloqueo exclusivo"); }
         catch (AtlasException error) { Check(error.Code == 5, "Bloqueo entre aperturas"); }
         session.Execute("CHECKPOINT");
         session.Execute("INSERT INTO datos VALUES (2,'WAL despues de checkpoint')");
@@ -102,12 +102,12 @@ using (Session session = database.CreateSession())
 {
     foreach (string sql in pieces) session.Execute(sql);
     Check(session.Execute("SELECT * FROM s").GetProperty("rows")[0][0].GetString() == "a;'b", "Script y comillas");
-    try { session.Execute("SELECT\0"); throw new Exception("NUL aceptado"); }
+    try { session.Execute("SELECT\0"); throw new InvalidOperationException("NUL aceptado"); }
     catch (ArgumentException) { checks++; }
-    try { session.Execute(new string('x', Session.MaxSqlBytes + 1)); throw new Exception("SQL enorme aceptado"); }
+    try { session.Execute(new string('x', Session.MaxSqlBytes + 1)); throw new InvalidOperationException("SQL enorme aceptado"); }
     catch (ArgumentException) { checks++; }
     session.Dispose();
-    try { session.Execute("SHOW TABLES"); throw new Exception("Sesion cerrada aceptada"); }
+    try { session.Execute("SHOW TABLES"); throw new InvalidOperationException("Sesion cerrada aceptada"); }
     catch (ObjectDisposedException) { checks++; }
 }
 Console.WriteLine($"AtlasDB Managed: {checks} comprobaciones correctas en {System.Runtime.InteropServices.RuntimeInformation.OSDescription}");
