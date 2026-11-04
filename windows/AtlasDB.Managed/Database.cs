@@ -31,7 +31,7 @@ public sealed class Database : IDisposable
         IntPtr pointer = Native.atlas_open(path, out IntPtr error);
         if (pointer == IntPtr.Zero)
         {
-            if (error == IntPtr.Zero) throw new OutOfMemoryException();
+            if (error == IntPtr.Zero) throw new InvalidOperationException("El motor no devolvio un error al abrir la base.");
             throw new AtlasException(Native.TakeString(error));
         }
         handle = new DatabaseHandle(pointer);
@@ -44,7 +44,7 @@ public sealed class Database : IDisposable
             IntPtr pointer = Native.atlas_session_create(handle, out IntPtr error);
             if (pointer == IntPtr.Zero)
             {
-                if (error == IntPtr.Zero) throw new OutOfMemoryException();
+                if (error == IntPtr.Zero) throw new InvalidOperationException("El motor no devolvio un error al crear la sesion.");
                 throw new AtlasException(Native.TakeString(error));
             }
             return new Session(new SessionHandle(pointer, handle));
