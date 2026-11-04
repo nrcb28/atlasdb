@@ -28,7 +28,12 @@
 static const unsigned char frame_magic[8] = {'A','T','L','A','S','D','B',0};
 
 typedef struct { ADBBuffer bytes; ADBError *error; } Encoder;
-typedef struct { const unsigned char *data; size_t length, offset; ADBError *error; bool failed; } Decoder;
+typedef struct {
+    const unsigned char *data;
+    size_t length, offset, memory_estimate;
+    ADBError *error;
+    bool failed;
+} Decoder;
 
 uint32_t adb_crc32(const void *data, size_t length) {
     const unsigned char *bytes = data;
@@ -144,6 +149,28 @@ static bool decode_fail(Decoder *dec, const char *message) {
     dec->failed = true;
     return adb_error(dec->error, ADB_ERR_CORRUPT, "invalid database payload at byte %zu: %s", dec->offset, message);
 }
+static bool decode_limit(Decoder *dec, const char *message) {
+    dec->failed = true;
+    return adb_error(dec->error, ADB_ERR_LIMIT, "database payload at byte %zu exceeds %u-byte memory budget: %s",
+                     dec->offset, ADB_MAX_STATE_MEMORY, message);
+}
+static bool reserve_decode_memory(Decoder *dec, size_t amount) {
+    if (amount > ADB_MAX_STATE_MEMORY ||
+        dec->memory_estimate > ADB_MAX_STATE_MEMORY - amount)
+        return decode_limit(dec, "state expansion");
+    dec->memory_estimate += amount;
+    return true;
+}
+static bool reserve_decode_array(Decoder *dec, size_t count, size_t element_size) {
+    if (element_size && count > SIZE_MAX / element_size)
+        return decode_limit(dec, "allocation size overflow");
+    return reserve_decode_memory(dec, count * element_size);
+}
+static bool reserve_decode_matrix(Decoder *dec, size_t rows, size_t columns, size_t element_size) {
+    if (element_size && columns > SIZE_MAX / element_size)
+        return decode_limit(dec, "matrix size overflow");
+    return reserve_decode_array(dec, rows, columns * element_size);
+}
 static const unsigned char *decode_bytes(Decoder *dec, size_t n) {
     if (dec->failed) return NULL;
     if (n > dec->length - dec->offset) { decode_fail(dec, "truncated field"); return NULL; }
@@ -167,6 +194,7 @@ static char *decode_string(Decoder *dec, bool name) {
     const unsigned char *p = decode_bytes(dec, n);
     if (!p) return NULL;
     if (memchr(p, 0, n)) { decode_fail(dec, "embedded NUL byte"); return NULL; }
+    if (!reserve_decode_array(dec, (size_t)n + 1u, 1)) return NULL;
     char *text = adb_alloc((size_t)n + 1u, 1, dec->error);
     if (!text) { dec->failed = true; return NULL; }
     memcpy(text, p, n); text[n] = '\0';
@@ -221,6 +249,7 @@ static bool validate_index_names(Decoder *dec, const ADBState *state) {
     size_t count = 0;
     for (size_t ti = 0; ti < state->ntables; ++ti) count += state->tables[ti].nindexes;
     if (count < 2) return true;
+    if (!reserve_decode_array(dec, count, sizeof(char *))) return false;
     const char **names = adb_alloc(count, sizeof(*names), dec->error);
     if (!names) { dec->failed = true; return false; }
     size_t at = 0;
@@ -236,7 +265,12 @@ static bool validate_index_names(Decoder *dec, const ADBState *state) {
 }
 
 ADBState *adb_state_decode(const unsigned char *data, size_t length, ADBError *error) {
-    Decoder dec = {data, length, 0, error, false};
+    Decoder dec = {
+        .data = data,
+        .length = length,
+        .error = error,
+        .memory_estimate = sizeof(ADBState)
+    };
     ADBState *state = NULL;
     if (!data || length > ADB_MAX_FRAME) { adb_error(error, ADB_ERR_CORRUPT, "invalid database payload size"); return NULL; }
     state = adb_state_create(error);
@@ -248,6 +282,7 @@ ADBState *adb_state_decode(const unsigned char *data, size_t length, ADBError *e
         goto fail;
     }
     if (ntables) {
+        if (!reserve_decode_array(&dec, ntables, sizeof(*state->tables))) goto fail;
         state->tables = adb_alloc(ntables, sizeof(*state->tables), error);
         if (!state->tables) goto fail;
     }
@@ -263,6 +298,7 @@ ADBState *adb_state_decode(const unsigned char *data, size_t length, ADBError *e
             if (!dec.failed) decode_fail(&dec, "invalid column count");
             goto fail;
         }
+        if (!reserve_decode_array(&dec, ncolumns, sizeof(*table->columns))) goto fail;
         table->columns = adb_alloc(ncolumns, sizeof(*table->columns), error);
         if (!table->columns) goto fail;
         table->ncolumns = ncolumns;
@@ -294,6 +330,7 @@ ADBState *adb_state_decode(const unsigned char *data, size_t length, ADBError *e
             goto fail;
         }
         if (nindexes) {
+            if (!reserve_decode_array(&dec, nindexes, sizeof(*table->indexes))) goto fail;
             table->indexes = adb_alloc(nindexes, sizeof(*table->indexes), error);
             if (!table->indexes) goto fail;
         }
@@ -316,6 +353,9 @@ ADBState *adb_state_decode(const unsigned char *data, size_t length, ADBError *e
             goto fail;
         }
         if (nrows) {
+            if (!reserve_decode_array(&dec, (size_t)nrows, sizeof(*table->rows)) ||
+                !reserve_decode_matrix(&dec, (size_t)nrows, table->ncolumns, sizeof(ADBValue)) ||
+                !reserve_decode_matrix(&dec, (size_t)nrows, nindexes, 128u)) goto fail;
             table->rows = adb_alloc((size_t)nrows, sizeof(*table->rows), error);
             if (!table->rows) goto fail;
         }

@@ -28,6 +28,8 @@ Cada registro WAL y cada snapshot usa una cabecera de 32 bytes seguida de una ca
 
 La carga contiene la versión de la base, los esquemas, las filas y las definiciones de índice. Los árboles en memoria se reconstruyen al decodificar. Los lectores comprueban longitudes y límites antes de reservar memoria o recorrer los datos. La versión inicial del formato no promete compatibilidad con futuras versiones de AtlasDB.
 
+La reconstrucción de un snapshot o WAL está limitada a una estimación de 512 MiB de memoria, además del límite de 256 MiB por trama. Una trama con muchas filas, columnas o índices puede ser válida y tener CRC correcto, pero se rechaza si su expansión en memoria supera ese presupuesto; así, un archivo persistente no puede forzar reservas de varios GiB durante la recuperación.
+
 CRC32 permite detectar daños accidentales; no es una firma criptográfica.
 
 ## Commit
